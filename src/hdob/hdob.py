@@ -273,6 +273,7 @@ class ToggleLabel(tk.Label):
             elif self.off_use_str:
                 self.config(text=self.off_indicator, image='')
 
+
 def main():
     current_dir = os.path.dirname(os.path.abspath(__file__))
     root = tk.Tk()
@@ -295,6 +296,7 @@ def main():
     shift.grid(row=2, column=0, padx=5, pady=5)
     clear.grid(row=2, column=1, padx=5, pady=5)
     root.mainloop()
+
 
 if __name__ == "__main__":
     main()

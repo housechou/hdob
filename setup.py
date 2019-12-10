@@ -32,7 +32,7 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     keywords="GUI UI tkinter Converter",
-    url="https://github.com/housechou/hdbo",
+    url="https://github.com/housechou/hdob",
     python_requires=">=3.5",
     package_dir={'': 'src'},
     packages=find_packages(
