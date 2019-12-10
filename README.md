@@ -1,6 +1,6 @@
 # hdob - The Hex, Decimal, Octal, Binary converter
 
-![](images/screenshot.png)
+![](https://raw.githubusercontent.com/housechou/hdob/master/images/screenshot.png)
 
 ## System Requirement
 Python3
