@@ -42,6 +42,9 @@ setup(
 	"console_scripts": [
             "hdob=hdob.hdob:main"
 	],
+	"gui_scripts": [
+            "hdob=hdob.hdob:main"
+	],
     },
     classifiers=(
         "Programming Language :: Python :: 3",

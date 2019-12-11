@@ -10,4 +10,7 @@ Python3
 python3 -m pip install --user hdob
 ```
 
-
+## Run
+```bash
+hdob
+```

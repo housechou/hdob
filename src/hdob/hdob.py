@@ -51,12 +51,14 @@ class BinView(tk.Frame):
         self.value = 0
         for i in range(0, 32):
             header = tk.Label(self, text=31 - i)
-            bit = ToggleLabel(self,
-                              '1',
-                              '0',
-                              highlightbackground='grey',
-                              highlightthickness=1,
-                              command=self.notify)
+            bit = ToggleLabel(
+                self,
+                '1',
+                '0',
+                command=self.notify,
+                highlightbackground='grey',
+                highlightthickness=1,
+            )
             self.bits.append(bit)
             header.grid(row=1, column=i, padx=5, pady=5)
             bit.grid(row=2, column=i, padx=5, pady=5)
@@ -214,7 +216,7 @@ class Shift(tk.Frame):
 
 class ClearButton(tk.Frame):
     def __init__(self, master, subject):
-        tk.Frame.__init__(self, master, highlightthickness=1)
+        tk.Frame.__init__(self, master)
         self.master = master
         self.subject = subject
         self.btn = tk.Button(self, text='Clear', command=self.clear)
@@ -231,9 +233,8 @@ class ToggleLabel(tk.Label):
                  off_indicator,
                  default_state=0,
                  command=None,
-                 *args,
                  **kwargs):
-        tk.Label.__init__(self, master, *args, **kwargs)
+        tk.Label.__init__(self, master, **kwargs)
         self.bind("<Button-1>",
                   lambda event, command=command: self.toggle(command))
         self.on_indicator = on_indicator
@@ -291,10 +292,10 @@ def main():
     subject.attach(oct_view)
     hex_view.grid(row=0, column=0, padx=5, pady=5, sticky='w')
     dec_view.grid(row=0, column=1, padx=5, pady=5, sticky='w')
-    oct_view.grid(row=0, column=2, padx=5, pady=5, sticky='w')
-    bin_view.grid(row=1, columnspan=3, padx=5, pady=5)
-    shift.grid(row=2, column=0, padx=5, pady=5)
-    clear.grid(row=2, column=1, padx=5, pady=5)
+    oct_view.grid(row=0, column=2, padx=5, pady=5, sticky='e')
+    bin_view.grid(row=1, columnspan=3, padx=5, pady=5, sticky='news')
+    shift.grid(row=2, column=0, padx=5, pady=5, sticky='w')
+    clear.grid(row=2, column=1, padx=5, pady=5, columnspan=2, sticky='e')
     root.mainloop()
 
 
