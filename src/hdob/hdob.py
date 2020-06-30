@@ -80,8 +80,10 @@ class BinView(tk.Frame):
             s = '{:d}'.format((val >> (31 - i)) & 0x1)
             if s == '1':
                 self.bits[i].config(text=s, background='yellow')
+                self.bits[i].current = True
             else:
                 self.bits[i].config(text=s, background='#d9d9d9')
+                self.bits[i].current = False
 
 
 class HexView(tk.Frame):
@@ -112,7 +114,8 @@ class HexView(tk.Frame):
     def update(self, val):
         self.value = val
         self.hex_entry.delete(0, 'end')
-        self.hex_entry.insert(0, '0x{:x}'.format(val))
+        if val != 0:
+            self.hex_entry.insert(0, '{:x}'.format(val))
 
 
 class DecView(tk.Frame):
