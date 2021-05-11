@@ -9,6 +9,7 @@ import time
 import sys
 import argparse
 import re
+import inspect
 from functools import wraps
 import tkinter as tk
 from tkinter import font as tkfont
@@ -17,6 +18,7 @@ from tkinter import messagebox
 from tkinter import PhotoImage
 
 __author__ = "House Chou"
+verbose = False
 
 
 class IntSubject():
@@ -30,10 +32,12 @@ class IntSubject():
     def detach(self, observer):
         self.observers.remove(observer)
 
-    def notify(self, val):
+    def notify(self, classinfo, val):
         self.value = val
         for observer in self.observers:
-            observer.update(val)
+            # update all observers except for the caller
+            if not isinstance(observer, type(classinfo)):
+                observer.update(val)
 
     def get_val(self):
         return self.value
@@ -65,13 +69,16 @@ class BinView(tk.Frame):
 
     def notify(self):
         bitstr = ''
-        for b in self.bits:
-            bitstr += b['text']
+        for bit_label in self.bits:
+            bitstr += bit_label['text']
         try:
             val = int(bitstr, 2)
-            self.subject.notify(val)
+            self.subject.notify(self, val)
         except ValueError as e:
-            print(e)
+            if verbose:
+                print("{}.{}:{}".format(self.__class__.__name__,
+                                        inspect.currentframe().f_code.co_name,
+                                        e))
 
     def update(self, val):
         self.value = val
@@ -92,9 +99,10 @@ class HexView(tk.Frame):
         self.master = master
         self.subject = subject
         self.value = 0
+        self.prefix = ""
         self.hex_label = tk.Label(self, text='Hex')
         self.hex_text = tk.StringVar()
-        self.hex_text.trace("w", lambda name, index, mode: self.notify())
+        self.traceid = self.hex_text.trace("w", self.notify)
         self.hex_entry = tk.Entry(self,
                                   width=10,
                                   textvariable=self.hex_text,
@@ -102,20 +110,26 @@ class HexView(tk.Frame):
         self.hex_label.grid(row=0, column=0)
         self.hex_entry.grid(row=0, column=1)
 
-    def notify(self):
+    def notify(self, *args):
         hex_str = self.hex_text.get()
+        self.prefix = "0x" if hex_str.startswith("0x") else ""
         try:
             val = int(hex_str, 16)
-            self.subject.notify(val)
+            self.subject.notify(self, val)
         except ValueError as e:
-            pass
-            #print(e)
+            if verbose:
+                print("{}.{}:{}".format(self.__class__.__name__,
+                                        inspect.currentframe().f_code.co_name,
+                                        e))
 
     def update(self, val):
         self.value = val
+        # disable tracer to prevent trigger the notify
+        self.hex_text.trace_vdelete("w", self.traceid)
         self.hex_entry.delete(0, 'end')
-        if val != 0:
-            self.hex_entry.insert(0, '{:x}'.format(val))
+        self.hex_entry.insert(0, '{:s}{:x}'.format(self.prefix, val))
+        # recover the tracer
+        self.traceid = self.hex_text.trace("w", self.notify)
 
 
 class DecView(tk.Frame):
@@ -126,7 +140,7 @@ class DecView(tk.Frame):
         self.value = 0
         self.dec_label = tk.Label(self, text='Dec')
         self.dec_text = tk.StringVar()
-        self.dec_text.trace("w", lambda name, index, mode: self.notify())
+        self.traceid = self.dec_text.trace("w", self.notify)
         self.dec_entry = tk.Entry(self,
                                   width=10,
                                   textvariable=self.dec_text,
@@ -134,19 +148,23 @@ class DecView(tk.Frame):
         self.dec_label.grid(row=0, column=0)
         self.dec_entry.grid(row=0, column=1)
 
-    def notify(self):
+    def notify(self, *args):
         dec_str = self.dec_text.get()
         try:
             val = int(dec_str, 10)
-            self.subject.notify(val)
+            self.subject.notify(self, val)
         except ValueError as e:
-            pass
-            #print(e)
+            if verbose:
+                print("{}.{}:{}".format(self.__class__.__name__,
+                                        inspect.currentframe().f_code.co_name,
+                                        e))
 
     def update(self, val):
         self.value = val
+        self.dec_text.trace_vdelete("w", self.traceid)
         self.dec_entry.delete(0, 'end')
         self.dec_entry.insert(0, '{:d}'.format(val))
+        self.traceid = self.dec_text.trace("w", self.notify)
 
 
 class OctView(tk.Frame):
@@ -157,7 +175,7 @@ class OctView(tk.Frame):
         self.value = 0
         self.oct_label = tk.Label(self, text='Oct')
         self.oct_text = tk.StringVar()
-        self.oct_text.trace("w", lambda name, index, mode: self.notify())
+        self.traceid = self.oct_text.trace("w", self.notify)
         self.oct_entry = tk.Entry(self,
                                   width=10,
                                   textvariable=self.oct_text,
@@ -165,19 +183,23 @@ class OctView(tk.Frame):
         self.oct_label.grid(row=0, column=0)
         self.oct_entry.grid(row=0, column=1)
 
-    def notify(self):
+    def notify(self, *args):
         oct_str = self.oct_text.get()
         try:
             val = int(oct_str, 8)
-            self.subject.notify(val)
+            self.subject.notify(self, val)
         except ValueError as e:
-            pass
-            #print(e)
+            if verbose:
+                print("{}.{}:{}".format(self.__class__.__name__,
+                                        inspect.currentframe().f_code.co_name,
+                                        e))
 
     def update(self, val):
         self.value = val
+        self.oct_text.trace_vdelete("w", self.traceid)
         self.oct_entry.delete(0, 'end')
         self.oct_entry.insert(0, '{:o}'.format(val))
+        self.traceid = self.oct_text.trace("w", self.notify)
 
 
 class Shift(tk.Frame):
@@ -203,18 +225,21 @@ class Shift(tk.Frame):
             shift = int(shift, 10)
             return shift
         except ValueError as e:
-            print(e)
+            if verbose:
+                print("{}.{}:{}".format(self.__class__.__name__,
+                                        inspect.currentframe().f_code.co_name,
+                                        e))
             return None
 
     def right_shift(self):
         shift = self.get_shift_val()
         if shift is not None:
-            self.subject.notify(self.subject.get_val() >> shift)
+            self.subject.notify(self, self.subject.get_val() >> shift)
 
     def left_shift(self):
         shift = self.get_shift_val()
         if shift is not None:
-            self.subject.notify(self.subject.get_val() << shift)
+            self.subject.notify(self, self.subject.get_val() << shift)
 
 
 class ClearButton(tk.Frame):
@@ -226,7 +251,7 @@ class ClearButton(tk.Frame):
         self.btn.grid(row=0, column=0)
 
     def clear(self):
-        self.subject.notify(0)
+        self.subject.notify(self, 0)
 
 
 class ToggleLabel(tk.Label):
@@ -279,7 +304,6 @@ class ToggleLabel(tk.Label):
 
 
 def main():
-    current_dir = os.path.dirname(os.path.abspath(__file__))
     root = tk.Tk()
     root.title("HDOB Converter")
     subject = IntSubject()
@@ -299,8 +323,22 @@ def main():
     bin_view.grid(row=1, columnspan=3, padx=5, pady=5, sticky='news')
     shift.grid(row=2, column=0, padx=5, pady=5, sticky='w')
     clear.grid(row=2, column=1, padx=5, pady=5, columnspan=2, sticky='e')
+    # Gets the requested values of the height and widht.
+    windowWidth = root.winfo_reqwidth()
+    windowHeight = root.winfo_reqheight()
+    if verbose:
+        print("Width", windowWidth, "Height", windowHeight)
+
+    # Gets both half the screen width/height and window width/height
+    positionRight = int(root.winfo_screenwidth()/2 - windowWidth/2)
+    positionDown = int(root.winfo_screenheight()/2 - windowHeight/2)
+
+    # Positions the window in the center of the page.
+    root.geometry("+{}+{}".format(positionRight, positionDown))
     root.mainloop()
 
 
 if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "-V":
+        verbose = True
     main()
