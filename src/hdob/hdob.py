@@ -133,10 +133,11 @@ class HexView(tk.Frame):
 
     def notify(self, *args):
         hex_str = self.strvar.get()
-        self.prefix = "0x" if hex_str.startswith("0x") else ""
-        str2int = Str2Int()
-        str2int.convert(hex_str, 16)
-        self.subject.notify(self, str2int)
+        if hex_str != "":
+            self.prefix = "0x" if hex_str.startswith("0x") else ""
+            str2int = Str2Int()
+            str2int.convert(hex_str, 16)
+            self.subject.notify(self, str2int)
 
     def clear(self):
         self.strvar.trace_vdelete("w", self.traceid)
@@ -174,9 +175,10 @@ class DecView(tk.Frame):
 
     def notify(self, *args):
         dec_str = self.strvar.get()
-        str2int = Str2Int()
-        str2int.convert(dec_str, 10)
-        self.subject.notify(self, str2int)
+        if dec_str != "":
+            str2int = Str2Int()
+            str2int.convert(dec_str, 10)
+            self.subject.notify(self, str2int)
 
     def clear(self):
         self.strvar.trace_vdelete("w", self.traceid)
@@ -211,9 +213,10 @@ class OctView(tk.Frame):
 
     def notify(self, *args):
         oct_str = self.strvar.get()
-        str2int = Str2Int()
-        str2int.convert(oct_str, 8)
-        self.subject.notify(self, str2int)
+        if oct_str != "":
+            str2int = Str2Int()
+            str2int.convert(oct_str, 8)
+            self.subject.notify(self, str2int)
 
     def clear(self):
         self.strvar.trace_vdelete("w", self.traceid)
