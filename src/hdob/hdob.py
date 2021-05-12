@@ -22,9 +22,9 @@ verbose = False
 
 
 class IntSubject():
+
     def __init__(self):
         self.observers = []
-        self.value = 0
 
     def attach(self, observer):
         self.observers.append(observer)
@@ -32,18 +32,40 @@ class IntSubject():
     def detach(self, observer):
         self.observers.remove(observer)
 
-    def notify(self, classinfo, val):
-        self.value = val
+    def notify(self, classinfo, result):
         for observer in self.observers:
-            # update all observers except for the caller
-            if not isinstance(observer, type(classinfo)):
-                observer.update(val)
+            if result.valid:
+                self.value = result.value
+            observer.update(result)
+
+    def clear(self):
+        for observer in self.observers:
+            observer.clear()
 
     def get_val(self):
         return self.value
 
 
+class Str2Int():
+    def __init__(self, value=0, valid=True):
+        self.value = value
+        self.valid = valid
+
+    def convert(self, str, base):
+        self.str = str
+        try:
+            self.value = int(str, base)
+            self.valid = True
+        except ValueError as e:
+            self.valid = False
+            if verbose:
+                print("{}.{}:{}".format(self.__class__.__name__,
+                                        inspect.currentframe().f_code.co_name,
+                                        e))
+
+
 class BinView(tk.Frame):
+
     def __init__(self, master, subject):
         tk.Frame.__init__(self,
                           master,
@@ -68,32 +90,30 @@ class BinView(tk.Frame):
             bit.grid(row=2, column=i, padx=5, pady=5)
 
     def notify(self):
+        str2int = Str2Int()
         bitstr = ''
         for bit_label in self.bits:
             bitstr += bit_label['text']
-        try:
-            val = int(bitstr, 2)
-            self.subject.notify(self, val)
-        except ValueError as e:
-            if verbose:
-                print("{}.{}:{}".format(self.__class__.__name__,
-                                        inspect.currentframe().f_code.co_name,
-                                        e))
+        str2int.convert(bitstr, 2)
+        self.subject.notify(self, str2int)
 
-    def update(self, val):
-        self.value = val
-        # iterate from MSB to LSB
-        for i in range(0, 32):
-            s = '{:d}'.format((val >> (31 - i)) & 0x1)
-            if s == '1':
-                self.bits[i].config(text=s, background='yellow')
-                self.bits[i].current = True
-            else:
-                self.bits[i].config(text=s, background='#d9d9d9')
-                self.bits[i].current = False
+    def clear(self):
+        self.update(Str2Int(0))
+
+    def update(self, result):
+        if result.valid:
+            self.value = val = result.value
+            # iterate from MSB to LSB
+            for i in range(0, 32):
+                s = (val >> (31 - i) & 0x1)
+                if s == 1:
+                    self.bits[i].config(state=True, background='yellow')
+                else:
+                    self.bits[i].config(state=False, background='#d9d9d9')
 
 
 class HexView(tk.Frame):
+
     def __init__(self, master, subject):
         tk.Frame.__init__(self, master)
         self.master = master
@@ -101,108 +121,116 @@ class HexView(tk.Frame):
         self.value = 0
         self.prefix = ""
         self.hex_label = tk.Label(self, text='Hex')
-        self.hex_text = tk.StringVar()
-        self.traceid = self.hex_text.trace("w", self.notify)
-        self.hex_entry = tk.Entry(self,
-                                  width=10,
-                                  textvariable=self.hex_text,
-                                  font=('Ariel', 12))
+        self.strvar = tk.StringVar()
+        self.traceid = self.strvar.trace("w", self.notify)
+        self.main_entry = tk.Entry(self,
+                                   width=10,
+                                   textvariable=self.strvar,
+                                   font=('Ubuntu Mono', 12))
+        self.main_entry.focus()
         self.hex_label.grid(row=0, column=0)
-        self.hex_entry.grid(row=0, column=1)
+        self.main_entry.grid(row=0, column=1)
 
     def notify(self, *args):
-        hex_str = self.hex_text.get()
+        hex_str = self.strvar.get()
         self.prefix = "0x" if hex_str.startswith("0x") else ""
-        try:
-            val = int(hex_str, 16)
-            self.subject.notify(self, val)
-        except ValueError as e:
-            if verbose:
-                print("{}.{}:{}".format(self.__class__.__name__,
-                                        inspect.currentframe().f_code.co_name,
-                                        e))
+        str2int = Str2Int()
+        str2int.convert(hex_str, 16)
+        self.subject.notify(self, str2int)
 
-    def update(self, val):
-        self.value = val
-        # disable tracer to prevent trigger the notify
-        self.hex_text.trace_vdelete("w", self.traceid)
-        self.hex_entry.delete(0, 'end')
-        self.hex_entry.insert(0, '{:s}{:x}'.format(self.prefix, val))
-        # recover the tracer
-        self.traceid = self.hex_text.trace("w", self.notify)
+    def clear(self):
+        self.strvar.trace_vdelete("w", self.traceid)
+        self.main_entry.delete(0, 'end')
+        self.traceid = self.strvar.trace("w", self.notify)
+
+    def update(self, result):
+        if result.valid:
+            self.value = result.value
+            # disable tracer to prevent trigger the notify
+            self.strvar.trace_vdelete("w", self.traceid)
+            self.main_entry.delete(0, 'end')
+            self.main_entry.insert(0, '{:s}{:X}'.format(self.prefix,
+                                                        self.value))
+            # recover the tracer
+            self.traceid = self.strvar.trace("w", self.notify)
 
 
 class DecView(tk.Frame):
+
     def __init__(self, master, subject):
         tk.Frame.__init__(self, master)
         self.master = master
         self.subject = subject
         self.value = 0
         self.dec_label = tk.Label(self, text='Dec')
-        self.dec_text = tk.StringVar()
-        self.traceid = self.dec_text.trace("w", self.notify)
-        self.dec_entry = tk.Entry(self,
-                                  width=10,
-                                  textvariable=self.dec_text,
-                                  font=('Ariel', 12))
+        self.strvar = tk.StringVar()
+        self.traceid = self.strvar.trace("w", self.notify)
+        self.main_entry = tk.Entry(self,
+                                   width=10,
+                                   textvariable=self.strvar,
+                                   font=('Ubuntu Mono', 12))
         self.dec_label.grid(row=0, column=0)
-        self.dec_entry.grid(row=0, column=1)
+        self.main_entry.grid(row=0, column=1)
 
     def notify(self, *args):
-        dec_str = self.dec_text.get()
-        try:
-            val = int(dec_str, 10)
-            self.subject.notify(self, val)
-        except ValueError as e:
-            if verbose:
-                print("{}.{}:{}".format(self.__class__.__name__,
-                                        inspect.currentframe().f_code.co_name,
-                                        e))
+        dec_str = self.strvar.get()
+        str2int = Str2Int()
+        str2int.convert(dec_str, 10)
+        self.subject.notify(self, str2int)
 
-    def update(self, val):
-        self.value = val
-        self.dec_text.trace_vdelete("w", self.traceid)
-        self.dec_entry.delete(0, 'end')
-        self.dec_entry.insert(0, '{:d}'.format(val))
-        self.traceid = self.dec_text.trace("w", self.notify)
+    def clear(self):
+        self.strvar.trace_vdelete("w", self.traceid)
+        self.main_entry.delete(0, 'end')
+        self.traceid = self.strvar.trace("w", self.notify)
+
+    def update(self, result):
+        if result.valid:
+            self.value = result.value
+            self.strvar.trace_vdelete("w", self.traceid)
+            self.main_entry.delete(0, 'end')
+            self.main_entry.insert(0, '{:d}'.format(self.value))
+            self.traceid = self.strvar.trace("w", self.notify)
 
 
 class OctView(tk.Frame):
+
     def __init__(self, master, subject):
         tk.Frame.__init__(self, master)
         self.master = master
         self.subject = subject
         self.value = 0
         self.oct_label = tk.Label(self, text='Oct')
-        self.oct_text = tk.StringVar()
-        self.traceid = self.oct_text.trace("w", self.notify)
-        self.oct_entry = tk.Entry(self,
-                                  width=10,
-                                  textvariable=self.oct_text,
-                                  font=('Ariel', 12))
+        self.strvar = tk.StringVar()
+        self.traceid = self.strvar.trace("w", self.notify)
+        self.main_entry = tk.Entry(self,
+                                   width=10,
+                                   textvariable=self.strvar,
+                                   font=('Ubuntu Mono', 12))
         self.oct_label.grid(row=0, column=0)
-        self.oct_entry.grid(row=0, column=1)
+        self.main_entry.grid(row=0, column=1)
 
     def notify(self, *args):
-        oct_str = self.oct_text.get()
-        try:
-            val = int(oct_str, 8)
-            self.subject.notify(self, val)
-        except ValueError as e:
-            if verbose:
-                print("{}.{}:{}".format(self.__class__.__name__,
-                                        inspect.currentframe().f_code.co_name,
-                                        e))
+        oct_str = self.strvar.get()
+        str2int = Str2Int()
+        str2int.convert(oct_str, 8)
+        self.subject.notify(self, str2int)
 
-    def update(self, val):
-        self.value = val
-        self.oct_text.trace_vdelete("w", self.traceid)
-        self.oct_entry.delete(0, 'end')
-        self.oct_entry.insert(0, '{:o}'.format(val))
-        self.traceid = self.oct_text.trace("w", self.notify)
+    def clear(self):
+        self.strvar.trace_vdelete("w", self.traceid)
+        self.main_entry.delete(0, 'end')
+        self.traceid = self.strvar.trace("w", self.notify)
+
+    def update(self, result):
+        if result.valid:
+            self.value = result.value
+            self.strvar.trace_vdelete("w", self.traceid)
+            self.main_entry.delete(0, 'end')
+            self.main_entry.insert(0, '{:o}'.format(self.value))
+            self.traceid = self.strvar.trace("w", self.notify)
 
 
 class Shift(tk.Frame):
+
     def __init__(self, master, subject):
         tk.Frame.__init__(self, master)
         self.master = master
@@ -234,15 +262,38 @@ class Shift(tk.Frame):
     def right_shift(self):
         shift = self.get_shift_val()
         if shift is not None:
-            self.subject.notify(self, self.subject.get_val() >> shift)
+            val = self.subject.get_val() >> shift
+            self.subject.notify(self, Str2Int(val))
 
     def left_shift(self):
         shift = self.get_shift_val()
         if shift is not None:
-            self.subject.notify(self, self.subject.get_val() << shift)
+            val = self.subject.get_val() << shift
+            self.subject.notify(self, Str2Int(val))
+
+
+class Status(tk.Frame):
+
+    def __init__(self, master):
+        tk.Frame.__init__(self, master)
+        self.master = master
+        self.status_label = tk.Label(self, text='Status:')
+        self.status = tk.Label(self)
+        self.status_label.grid(row=0, column=0)
+        self.status.grid(row=0, column=1)
+
+    def clear(self):
+        self.status.config(text='')
+
+    def update(self, result):
+        if result.valid:
+            self.status.config(text='OK', fg='green')
+        else:
+            self.status.config(text='FAIL', fg='red')
 
 
 class ClearButton(tk.Frame):
+
     def __init__(self, master, subject):
         tk.Frame.__init__(self, master)
         self.master = master
@@ -251,61 +302,71 @@ class ClearButton(tk.Frame):
         self.btn.grid(row=0, column=0)
 
     def clear(self):
-        self.subject.notify(self, 0)
+        self.subject.clear()
 
 
 class ToggleLabel(tk.Label):
+
     def __init__(self,
                  master,
-                 on_indicator,
-                 off_indicator,
-                 default_state=0,
+                 show_on,
+                 show_off,
+                 default_state=False,
                  command=None,
                  **kwargs):
         tk.Label.__init__(self, master, **kwargs)
+        # bind to mouse left button
         self.bind("<Button-1>",
-                  lambda event, command=command: self.toggle(command))
-        self.on_indicator = on_indicator
-        self.off_indicator = off_indicator
-        self.on_use_img = 0
-        self.off_use_img = 0
-        self.on_use_str = 0
-        self.off_use_str = 0
-        if type(on_indicator) == PhotoImage:
-            self.on_use_img = 1
-        elif type(on_indicator) == str:
-            self.on_use_str = 1
-
-        if type(off_indicator) == PhotoImage:
-            self.off_use_img = 1
-        elif type(off_indicator) == str:
-            self.off_use_str = 1
-
+                  lambda event: self.toggle(command))
+        self.show_on = show_on
+        self.show_off = show_off
+        self.config_show_type()
         self.current = default_state
-        self.set_state(default_state)
+        self.config(default_state)
+
+    def config_show_type(self):
+        self.on_use_img = False
+        self.on_use_str = False
+        self.off_use_img = False
+        self.off_use_str = False
+        if type(self.show_on) == PhotoImage:
+            self.on_use_img = True
+        elif type(self.show_on) == str:
+            self.on_use_str = True
+        else:
+            raise TypeError
+
+        if type(self.show_off) == PhotoImage:
+            self.off_use_img = True
+        elif type(self.show_off) == str:
+            self.off_use_str = True
+        else:
+            raise TypeError
 
     def toggle(self, func):
         self.current = not self.current
-        self.set_state(self.current)
+        self.config(self.current)
         if func is not None:
             func()
 
-    def set_state(self, state):
+    def config(self, state, **kwargs):
         if state:
             if self.on_use_img:
-                self.config(text='', image=self.on_indicator)
+                super().config(text='', image=self.show_on, **kwargs)
             elif self.on_use_str:
-                self.config(text=self.on_indicator, image='')
+                super().config(text=self.show_on, image='', **kwargs)
         else:
             if self.off_use_img:
-                self.config(text='', image=self.off_indicator)
+                super().config(text='', image=self.show_off)
             elif self.off_use_str:
-                self.config(text=self.off_indicator, image='')
+                super().config(text=self.show_off, image='', **kwargs)
+        self.current = state
 
 
 def main():
     root = tk.Tk()
     root.title("HDOB Converter")
+    status = Status(root)
     subject = IntSubject()
     bin_view = BinView(root, subject)
     hex_view = HexView(root, subject)
@@ -317,12 +378,14 @@ def main():
     subject.attach(hex_view)
     subject.attach(dec_view)
     subject.attach(oct_view)
+    subject.attach(status)
     hex_view.grid(row=0, column=0, padx=5, pady=5, sticky='w')
     dec_view.grid(row=0, column=1, padx=5, pady=5, sticky='w')
     oct_view.grid(row=0, column=2, padx=5, pady=5, sticky='e')
     bin_view.grid(row=1, columnspan=3, padx=5, pady=5, sticky='news')
     shift.grid(row=2, column=0, padx=5, pady=5, sticky='w')
-    clear.grid(row=2, column=1, padx=5, pady=5, columnspan=2, sticky='e')
+    status.grid(row=2, column=1, padx=5, pady=5, columnspan=1, sticky='w')
+    clear.grid(row=2, column=2, padx=5, pady=5, columnspan=2, sticky='e')
     # Gets the requested values of the height and widht.
     windowWidth = root.winfo_reqwidth()
     windowHeight = root.winfo_reqheight()
@@ -330,8 +393,8 @@ def main():
         print("Width", windowWidth, "Height", windowHeight)
 
     # Gets both half the screen width/height and window width/height
-    positionRight = int(root.winfo_screenwidth()/2 - windowWidth/2)
-    positionDown = int(root.winfo_screenheight()/2 - windowHeight/2)
+    positionRight = int(root.winfo_screenwidth() / 2 - windowWidth / 2)
+    positionDown = int(root.winfo_screenheight() / 2 - windowHeight / 2)
 
     # Positions the window in the center of the page.
     root.geometry("+{}+{}".format(positionRight, positionDown))
