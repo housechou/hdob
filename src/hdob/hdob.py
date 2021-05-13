@@ -19,6 +19,7 @@ from tkinter import PhotoImage
 
 __author__ = "House Chou"
 verbose = False
+g_font = 'Hack'
 
 
 class IntSubject():
@@ -32,11 +33,12 @@ class IntSubject():
     def detach(self, observer):
         self.observers.remove(observer)
 
-    def notify(self, classinfo, result):
+    def notify(self, caller, result):
         for observer in self.observers:
-            if result.valid:
-                self.value = result.value
-            observer.update(result)
+            if not isinstance(observer, type(caller)):
+                if result.valid:
+                    self.value = result.value
+                observer.update(result)
 
     def clear(self):
         for observer in self.observers:
@@ -93,7 +95,12 @@ class BinView(tk.Frame):
         str2int = Str2Int()
         bitstr = ''
         for bit_label in self.bits:
-            bitstr += bit_label['text']
+            bit = bit_label['text']
+            if bit == '1':
+                bit_label.config(state=True, background='yellow')
+            else:
+                bit_label.config(state=False, background='#d9d9d9')
+            bitstr += bit
         str2int.convert(bitstr, 2)
         self.subject.notify(self, str2int)
 
@@ -126,7 +133,7 @@ class HexView(tk.Frame):
         self.main_entry = tk.Entry(self,
                                    width=10,
                                    textvariable=self.strvar,
-                                   font=('Ubuntu Mono', 12))
+                                   font=(g_font, 12))
         self.main_entry.focus()
         self.hex_label.grid(row=0, column=0)
         self.main_entry.grid(row=0, column=1)
@@ -150,7 +157,7 @@ class HexView(tk.Frame):
             # disable tracer to prevent trigger the notify
             self.strvar.trace_vdelete("w", self.traceid)
             self.main_entry.delete(0, 'end')
-            self.main_entry.insert(0, '{:s}{:X}'.format(self.prefix,
+            self.main_entry.insert(0, '{:s}{:x}'.format(self.prefix,
                                                         self.value))
             # recover the tracer
             self.traceid = self.strvar.trace("w", self.notify)
@@ -169,7 +176,7 @@ class DecView(tk.Frame):
         self.main_entry = tk.Entry(self,
                                    width=10,
                                    textvariable=self.strvar,
-                                   font=('Ubuntu Mono', 12))
+                                   font=(g_font, 12))
         self.dec_label.grid(row=0, column=0)
         self.main_entry.grid(row=0, column=1)
 
@@ -207,7 +214,7 @@ class OctView(tk.Frame):
         self.main_entry = tk.Entry(self,
                                    width=10,
                                    textvariable=self.strvar,
-                                   font=('Ubuntu Mono', 12))
+                                   font=(g_font, 12))
         self.oct_label.grid(row=0, column=0)
         self.main_entry.grid(row=0, column=1)
 
@@ -245,7 +252,7 @@ class Shift(tk.Frame):
         self.shift_entry = tk.Entry(self,
                                     width=2,
                                     textvariable=self.shift_text,
-                                    font=('Ariel', 12))
+                                    font=(g_font, 12))
         self.lbtn.grid(row=0, column=0, padx=2)
         self.shift_entry.grid(row=0, column=1, padx=2)
         self.rbtn.grid(row=0, column=2, padx=2)
